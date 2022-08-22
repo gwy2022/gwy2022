@@ -54,8 +54,8 @@ vpd = np.clip(vpd, 0, np.inf)
 env = pmodel.PModelEnvironment(tc=temp,co2=co2, patm=patm, vpd=vpd)
 model = pmodel.PModel(env)
 
-soilmstress = pmodel.calc_soilmstress(soilm=soilm,meanalpha=0.8, pmodel_params=pmodel.PModelParams(soilmstress_theta0=0.0, soilmstress_thetastar=0.6, soilmstress_a=0.33490, soilmstress_b=1.456))
-model_soil = pmodel.PModel(env,soilmstress = soilmstress, kphio=0.094)
+soilmstress = pmodel.calc_soilmstress(soilm=soilm,meanalpha=np.mean(alpha1), pmodel_params=pmodel.PModelParams(soilmstress_theta0=0.0, soilmstress_thetastar=0.6, soilmstress_a=0.33490, soilmstress_b=1.456))
+model_soil = pmodel.PModel(env,soilmstress = soilmstress)
 
 ##gpp estimates
 ORG = model.estimate_productivity(fapar=fapar, ppfd=ppfd)
@@ -76,7 +76,7 @@ df['Full_Splash'] = Full_Splash
 df['Full_MeaSp'] = Full_MeaSp
 df['site'] = name
 
-df.to_csv ('US_Ne3_full.csv',index = False,sep=',')
+df.to_csv ('at_neu_full.csv',index = False,sep=',')
 
 
 ##compare gpp difference 
