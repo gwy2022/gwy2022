@@ -1,0 +1,155 @@
+library('nlsboot')
+library('ggplot2')
+####fitted gpp with soilsm
+fapar_est <- function(lue_sw,soilflx,fapar) {
+  GPP <- fapar * lue_sw * soilflx
+  GPP
+}
+
+
+
+nlsboot_onepar <- function (nls, niter = 999) {
+  if (!inherits(nls, "nls")) 
+    stop("Use only with 'nls' objects")
+  data2 <- eval(nls$data, sys.frame(0))
+  fitted1 <- fitted(nls)
+  resid1 <- resid(nls)
+  var1 <- all.vars(formula(nls)[[2]])
+  l1 <- lapply(1:niter, function(i) {
+    data2[, var1] <- fitted1 + sample(scale(resid1, scale = FALSE), 
+                                      replace = TRUE)
+    nls2 <- try(update(nls, start = as.list(coef(nls)), 
+                       data = data2), silent = TRUE)
+    if (inherits(nls2, "nls")) 
+      return(list(coef = coef(nls2), rse = summary(nls2)$sigma))
+  })
+  if (sum(sapply(l1, is.null)) > niter/2) 
+    stop(paste("Procedure aborted: the fit only converged in", 
+               round(sum(sapply(l1, is.null))/niter), "% during bootstrapping"))
+  tabboot <- sapply(l1[!sapply(l1, is.null)], function(z) z$coef,simplify = 
+                      FALSE)
+  tabboot <- as.matrix(t(as.numeric(tabboot)))
+  rownames(tabboot) <- "b"
+  rseboot <- sapply(l1[!sapply(l1, is.null)], function(z) z$rse)
+  recapboot <- t(apply(tabboot, 1, quantile, c(0.5, 0.025, 
+                                               0.975)))
+  colnames(recapboot) <- c("Median", "2.5%", "97.5%")
+  estiboot <- t(apply(tabboot, 1, function(z) c(mean(z), sd(z))))
+  colnames(estiboot) <- c("Estimate", "Std. error")
+  serr <- sum(sapply(l1, is.null))
+  if (serr > 0) 
+    warning(paste("The fit did not converge", serr, "times during 
+bootstrapping"))
+  listboot <- list(coefboot = t(tabboot), rse = rseboot, bootCI = recapboot, 
+                   estiboot = estiboot)
+  class(listboot) <- "nlsBoot"
+  return(listboot)
+}
+as.lm.nls <- function(object, ...) {
+  if (!inherits(object, "nls")) {
+    w <- paste("expected object of class nls but got object of class:",
+               paste(class(object), collapse = " "))
+    warning(w)
+  }
+  
+  gradient <- object$m$gradient()
+  if (is.null(colnames(gradient))) {
+    colnames(gradient) <- names(object$m$getPars())
+  }
+  
+  response.name <- if (length(formula(object)) == 2) "0" else
+    as.character(formula(object)[[2]])
+  
+  lhs <- object$m$lhs()
+  L <- data.frame(lhs, gradient)
+  names(L)[1] <- response.name
+  
+  fo <- sprintf("%s ~ %s - 1", response.name,
+                paste(colnames(gradient), collapse = "+"))
+  L <- as.proto(as.list(L))
+  fo <- as.formula(fo, env = L)
+  
+  do.call('lm', list(fo, offset = substitute(fitted(object))))
+}
+data_test$lue_sw <- data_test$lue*data_test$sw_in
+photo = list()
+for (i in land){
+  data_test1 <- data_test[which(data_test$land==i),]
+  ymax = max(data_test1$GPP)
+  ymin  = min(data_test1$GPP)
+  nls1 <-  nls(GPP~fapar_est(lue_sw, soilflx, fapar), data = data_test1, start = list(fapar = 0.5))
+  result <- nlsboot_onepar(nls1, niter = 999)
+  Param_Boo <- result$coefboot
+  # Calculate the confidence interval
+  predCI <- predict(as.lm.nls(nls1), interval = 'confidence', level = 0.95)
+  # Make the predictions on our defined x
+  pred1 <- approx(data_test1$fapar, predCI[, 1], xout = x) ## fitted values
+  pred2 <- approx(data_test1$fapar, predCI [, 2], xout = x) ## lower CI
+  pred3 <- approx(data_test1$fapar, predCI[, 3], xout = x) ## upper CI
+  
+  predVals1 <- data.frame(x=x, fit=pred1$y,lower=pred2$y,upper=pred3$y)
+  # Plot using ggplot
+  
+  p1<-ggplot(predVals1, aes(x, fit,lower,upper)) +
+    geom_line(aes(y = fit,color='Fitted Model'))+
+    geom_line(aes(y = lower,color='Lower confidence band'))+
+    geom_line(aes(y = upper,color='Upper condifence band'))+
+    ggtitle('fapar_sm')+
+    geom_ribbon(aes(ymin=lower, ymax=upper,alpha=0.05))+
+    geom_point(data=data_test1, aes(x = fapar, y = GPP),size=0.5)+
+    theme_classic()+
+    ylim(ymin, ymax)+
+    theme(legend.position="none")
+  
+  
+  nls2 <-  nls(GPP~fapar_est(lue_sw,wd_8day, fapar), data = data_test1, start = list(fapar = 0.5))
+  result <- nlsboot_onepar(nls2, niter = 999)
+  Param_Boo <- result$coefboot
+  # Calculate the confidence interval
+  predCI <- predict(as.lm.nls(nls2), interval = 'confidence', level = 0.95)
+  # Make the predictions on our defined x
+  pred1 <- approx(data_test1$fapar, predCI[, 1], xout = x) ## fitted values
+  pred2 <- approx(data_test1$fapar, predCI [, 2], xout = x) ## lower CI
+  pred3 <- approx(data_test1$fapar, predCI[, 3], xout = x) ## upper CI
+  
+  predVals2<- data.frame(x=x, fit=pred1$y,lower=pred2$y,upper=pred3$y)
+  p2<-ggplot(predVals2, aes(x, fit,lower,upper)) +
+    geom_line(aes(y = fit,color='Fitted Model'))+
+    geom_line(aes(y = lower,color='Lower confidence band'))+
+    geom_line(aes(y = upper,color='Upper condifence band'))+
+    ggtitle('fapar_wd')+
+    geom_ribbon(aes(ymin=lower, ymax=upper,alpha=0.05))+
+    theme_classic()+
+    ylim(ymin, ymax)+
+    geom_point(data=data_test1, aes(x = fapar,y = GPP),size=0.5)+
+    theme(legend.position="none")
+
+  nls3 <-  nls(GPP~fapar_est(lue_sw,1, fapar), data = data_test1, start = list(fapar = 0.5))  
+  result <- nlsboot_onepar(nls3, niter = 999)
+  Param_Boo <- result$coefboot
+  # Calculate the confidence interval
+  predCI <- predict(as.lm.nls(nls3), interval = 'confidence', level = 0.95)
+  # Make the predictions on our defined x
+  pred1 <- approx(data_test1$fapar, predCI[, 1], xout = x) ## fitted values
+  pred2 <- approx(data_test1$fapar, predCI [, 2], xout = x) ## lower CI
+  pred3 <- approx(data_test1$fapar, predCI[, 3], xout = x) ## upper CI
+  
+  predVals3 <- data.frame(x=x, fit=pred1$y,lower=pred2$y,upper=pred3$y)
+  p3<-ggplot(predVals3, aes(x, fit,lower,upper)) +
+    geom_line(aes(y = fit,color='Fitted Model'))+
+    geom_line(aes(y = lower,color='Lower confidence band'))+
+    geom_line(aes(y = upper,color='Upper condifence band'))+   
+    ylim(ymin, ymax)+
+    ggtitle('fapar_ob')+
+    geom_ribbon(aes(ymin=lower, ymax=upper,alpha=0.05))+
+    theme_classic()+
+    geom_point(data=data_test1, aes(x = fapar,y = GPP),size=0.5)+theme(legend.position="none")
+  
+  p4<-ggarrange(p1,p2,p3,ncol=3,nrow=1,common.legend = TRUE, legend = 'bottom')
+  p4<-annotate_figure(p4,bottom = text_grob(paste(i) , color = "black", size = 12))
+  photo[i]<-list(p4)
+}
+for (i in 1:8) {
+  out = photo[[i]]
+  ggsave(out,filename= paste0(i, "_fitted", ".jpg"),width = 2048,height = 1080,units = 'px')
+}
