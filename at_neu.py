@@ -21,8 +21,8 @@ import numpy as np
 from pyrealm import pmodel
 import pandas as pd
 
-ds = pd.read_csv('//Users/wenyaogan/Downloads/pmodelproject/workspace/Archive_result/US_Ne3.csv')   ##able to filter different vegetation type
-ds['elevation'] = 363
+ds = pd.read_csv('//Users/wenyaogan/Downloads/pmodelproject/workspace/Archive_result/AT_Neu.csv')   ##able to filter different vegetation type
+ds['elevation'] = 978
 # Extract the six variables for all months
 temp = np.array(ds['TA_F'][:])
 co2 = np.array(ds['co2_annual'][:] )        # Note - spatially constant but mapped.
@@ -68,7 +68,7 @@ Full_MeaSp =  model_soil.estimate_productivity(fapar=fapar_pre, ppfd=ppfd)
 Full_MeaSp = model_soil.gpp
 df = pd.DataFrame(time)
 df['time'] = pd.to_datetime(time)
-name = 'US_Ne3'
+name = 'AT-Neu'
 df['ORG'] = ORG
 df['ORG_Mea'] =ORG_Mea 
 df['ob_gpp'] = gpp_site
